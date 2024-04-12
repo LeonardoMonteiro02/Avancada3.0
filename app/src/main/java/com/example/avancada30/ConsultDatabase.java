@@ -16,6 +16,7 @@
 
 package com.example.avancada30;
 
+import android.content.Context;
 import android.util.Log;
 import androidx.annotation.NonNull;
 
@@ -36,13 +37,15 @@ public class ConsultDatabase extends Thread {
     private double longitude;
     private Semaphore semaphore;
     private DatabaseReference databaseReference = FirebaseDatabase.getInstance().getReference();
+    private Context contesto;
 
-    public ConsultDatabase(List<Region> regions, String locationName, double latitude, double longitude, Semaphore semaphore) {
+    public ConsultDatabase(Context contesto, List<Region> regions, String locationName, double latitude, double longitude, Semaphore semaphore) {
         this.regions = regions;
         this.locationName = locationName;
         this.latitude = latitude;
         this.longitude = longitude;
         this.semaphore = semaphore;
+        this.contesto = contesto;
     }
 
     @Override
@@ -77,38 +80,14 @@ public class ConsultDatabase extends Thread {
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 Log.d("Consulta Banco de Dados", "Erro na leitura do Banco de Dados: " + error.getMessage());
-                semaphore.release();
+
             }
         });
     }
 
     private void processarRegioes(List<Region> regionsFromDatabase) {
-        boolean regionExists = false;
-        for (Region region : regionsFromDatabase) {
-            if (region.getName().equals(locationName)) {
-                regionExists = true;
-                break;
-            }
-        }
-
-        if (!regionExists) {
-            boolean tooClose = checkRegionProximity(latitude, longitude, regionsFromDatabase);
-            if (!tooClose) {
-                RegionUpdaterThread thread = new RegionUpdaterThread(regions, locationName, latitude, longitude, semaphore);
-                semaphore.release();
-                thread.start();
-                try {
-                    thread.join();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            } else {
-                Log.d("Consulta Banco de Dados ", "A nova região está muito próxima de outra região do Banco");
-            }
-        } else {
-            Log.d("Consulta Banco de Dados", "Esta região já está na lista do Banco de Dados");
-        }
-        Log.d("Consulta Banco de Dados", "Thread Finalizada");
+        Log.d("Consulta Banco de Dados", "Nome localização " + locationName);
+        avaliaDados (regionsFromDatabase);
     }
 
     private boolean checkRegionProximity(double latitude, double longitude, List<Region> regions) {
@@ -120,5 +99,45 @@ public class ConsultDatabase extends Thread {
             }
         }
         return false;
+    }
+
+    public void avaliaDados (List<Region> listaBD){
+        double distancia;
+        boolean verificacao = false;
+        for (Region region : listaBD) {
+            if (region instanceof Region) {
+                distancia = region.calculateDistance(region.getLatitude(), region.getLongitude(), latitude, longitude);
+                if (distancia < 30) {
+                    verificacao = true;
+                }
+            }
+
+        }
+        if (verificacao == true) {
+            Region ultimoObjeto = listaBD.get(listaBD.size() - 1);
+            if (ultimoObjeto instanceof Region) {
+                RegionUpdaterThread thread = new RegionUpdaterThread(contesto,regions, locationName, latitude, longitude, semaphore);
+                thread.start();
+            } else if (ultimoObjeto instanceof SubRegion) {
+                distancia = ultimoObjeto.calculateDistance(ultimoObjeto.getLatitude(), ultimoObjeto.getLongitude(), latitude, longitude);
+                if (distancia > 5) {
+                    RegionUpdaterThread thread = new RegionUpdaterThread(contesto,regions, locationName, latitude, longitude, semaphore);
+                    thread.start();
+                }
+            } else if (ultimoObjeto instanceof RestrictedRegion) {
+                distancia = ultimoObjeto.calculateDistance(ultimoObjeto.getLatitude(), ultimoObjeto.getLongitude(), latitude, longitude);
+                if (distancia > 5) {
+                    RegionUpdaterThread thread = new RegionUpdaterThread(contesto,regions, locationName, latitude, longitude, semaphore);
+                    thread.start();
+                }
+
+            }
+
+        }
+        else {
+
+            RegionUpdaterThread thread = new RegionUpdaterThread(contesto,regions, locationName, latitude, longitude, semaphore);
+            thread.start();
+        }
     }
 }

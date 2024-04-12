@@ -17,7 +17,10 @@
 package com.example.avancada30;
 
 
+import android.content.Context;
+import android.content.Intent;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
@@ -35,15 +38,17 @@ public class RegionUpdaterThread extends Thread {
 
     private Semaphore semaphore;
     Random random = new Random();
+    Context contesto;
 
     private DatabaseReference referencia = FirebaseDatabase.getInstance().getReference();
 
-    public RegionUpdaterThread(List<Region> regions, String locationName, double latitude, double longitude, Semaphore semaphore) {
+    public RegionUpdaterThread(Context context, List<Region> regions, String locationName, double latitude, double longitude, Semaphore semaphore) {
         this.regions = regions;
         this.locationName = locationName;
         this.latitude = latitude;
         this.longitude = longitude;
         this.semaphore = semaphore;
+        this.contesto = context;
     }
 
     /**
@@ -56,77 +61,78 @@ public class RegionUpdaterThread extends Thread {
      */
     @Override
     public void run() {
-        try {
+
             // Adquira a permissão do semáforo antes de acessar a lista
+        try {
             semaphore.acquire();
-
-            // Verificar se a região já existe na lista
-            boolean regionExists = false;
-            for (Region region : regions) {
-                Log.d("Consulta Na Lista", "Região do Banco de Dados - Nome: " + region.getName());
-                if (region.getName().equals(locationName)) {
-                    regionExists = true;
-                    break;
-                }
-            }
-
-            if (!regionExists) {
-                // Verificar se a nova região está a menos de 30 metros de distância de outras regiões na lista
-                boolean tooClose = checkRegionProximity(latitude, longitude, regions);
-
-                if (!tooClose) {
-                    // Criar um objeto Region com os dados da localização
-                    Region newRegion = new Region(locationName, latitude, longitude, System.nanoTime(), Math.abs(random.nextInt()));
-
-                    // Adicionar o objeto Region à lista de regiões
-                    regions.add(newRegion);
-
-                    // Exibir o tamanho atual da lista de regiões no log
-                    Log.d("Consulta Na Lista", "Região Adicionada na Lista " + "Size lista:  " + newRegion.getuser());
-                } else {
-                    // Se a nova região estiver muito próxima de outra região, registrar uma mensagem no log
-                    Log.d("Consulta Na Lista", "A nova região está muito próxima de outra região da Lista");
-                }
-            } else {
-                // Se a região já existir, registrar uma mensagem no log
-                Log.d("Consulta Na Lista", "Esta região já está na lista");
-            }
         } catch (InterruptedException e) {
-            // Lidar com qualquer exceção de interrupção que possa ocorrer
-            e.printStackTrace();
-        } finally {
-            // Libere a permissão do semáforo após acessar a lista
-            semaphore.release();
-            Log.d("Consulta Na Lista", "Semáforo da Lista liberado");
+            throw new RuntimeException(e);
         }
-        Log.d("Consulta Na Lista", "Thread Finalizada");
+
+        avaliaDados();
+        semaphore.release();
+
     }
 
 
-    /**
-     * Verifica se a nova região está muito próxima de outras regiões na lista.
-     * Utiliza um objeto GeoCalculator para calcular a distância entre a nova região e as regiões existentes na lista.
-     * Percorre todas as regiões na lista e calcula a distância entre cada uma delas e a nova região.
-     * Se a distância entre a nova região e qualquer região na lista for menor que 30 metros, retorna verdadeiro.
-     * Caso contrário, retorna falso.
-     *
-     * @param latitude  A latitude da nova região.
-     * @param longitude A longitude da nova região.
-     * @param regions   A lista de regiões existentes.
-     * @return True se a nova região estiver muito próxima de outras regiões na lista, false caso contrário.
-     */
-    private boolean checkRegionProximity(double latitude, double longitude, List<Region> regions) {
-        GeoCalculator cal = new GeoCalculator();
+
+    public void avaliaDados (){
+        double distancia;
+        boolean verificacao = false;
         for (Region region : regions) {
-            // Calcula a distância entre a nova região e a região atual na lista
-            double distance = cal.calculateDistance(region.getLatitude(), region.getLongitude(), latitude, longitude);
-            // Se a distância for menor que 30 metros, retorna verdadeiro
-            if (distance < 30) {
-                return true;
+            if (region instanceof Region) {
+                distancia = region.calculateDistance(region.getLatitude(), region.getLongitude(), latitude, longitude);
+                Log.d("Consulta Lista", "Distancia é igual:  " + distancia);
+                if (distancia < 30) {
+                    verificacao = true;
+                }
             }
+
         }
-        // Se nenhuma região na lista estiver muito próxima da nova região, retorna falso
-        return false;
+        if (verificacao == true) {
+            Region ultimoObjeto = regions.get(regions.size() - 1);
+            if (ultimoObjeto instanceof Region) {
+                Log.d("Consulta Lista", "Nome localização " + locationName);
+                SubRegion newsubregion = new SubRegion(locationName, latitude, longitude, Math.abs(random.nextInt()), System.nanoTime(), ultimoObjeto);
+                regions.add(newsubregion);
+                Log.d("Consulta Na Lista", "SubRegião Salva na Lista");
+                Log.d("Consulta Na Lista", "Tamanho da Lista: " + regions.size());
+            } else if (ultimoObjeto instanceof SubRegion) {
+
+                distancia = ultimoObjeto.calculateDistance(ultimoObjeto.getLatitude(), ultimoObjeto.getLongitude(), latitude, longitude);
+                if (distancia > 5) {
+                    Log.d("Consulta Lista", "Nome localização " + locationName);
+                    RestrictedRegion newrestrictregion = new RestrictedRegion(locationName, latitude, longitude, Math.abs(random.nextInt()), System.nanoTime(), true, ultimoObjeto);
+                    regions.add(newrestrictregion);
+                    Log.d("Consulta Na Lista", "Região Restrita Salva na Lista");
+                    Log.d("Consulta Na Lista", "Tamanho da Lista: " + regions.size());
+                }
+                else {
+                    Log.d("Consulta Na Lista", "A nova Região restrita está muito próxima da SubRegião  da Lista");
+                }
+            } else if (ultimoObjeto instanceof RestrictedRegion) {
+                distancia = ultimoObjeto.calculateDistance(ultimoObjeto.getLatitude(), ultimoObjeto.getLongitude(), latitude, longitude);
+                if (distancia > 5) {
+                    Log.d("Consulta Lista", "Nome localização " + locationName);
+                    SubRegion newsubregion = new SubRegion(locationName, latitude, longitude, Math.abs(random.nextInt()), System.nanoTime(), ultimoObjeto);
+                    regions.add(newsubregion);
+                    Log.d("Consulta Na Lista", "SubRegião Salva na Lista");
+                    Log.d("Consulta Na Lista", "Tamanho da Lista: " + regions.size());
+                }
+                else {
+                    Log.d("Consulta Na Lista", "A nova Subregião está muito próxima da região restita da Lista");
+                }
+
+            }
+
+        }
+        else {
+            Log.d("Consulta Lista", "Nome localização " + locationName);
+            Region newsubregion = new Region(locationName, latitude, longitude, System.nanoTime(),Math.abs(random.nextInt()));
+            regions.add(newsubregion);
+            Log.d("Consulta Na Lista", "Região Salva na Lista");
+            Log.d("Consulta Na Lista", "Tamanho da Lista: " + regions.size());
+        }
     }
 
 }

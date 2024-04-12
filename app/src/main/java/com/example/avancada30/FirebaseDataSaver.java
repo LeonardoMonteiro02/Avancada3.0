@@ -64,7 +64,7 @@ public class FirebaseDataSaver extends Thread {
                     saveData();
 
                     semaphore.release(); // Release semaphore after saving
-                    Log.d(TAG, "Semaphore released.");
+                    Log.d(TAG, "Semafaro Liberado.");
                 }
 
             } catch (InterruptedException e) {
@@ -88,6 +88,6 @@ public class FirebaseDataSaver extends Thread {
         }
 
         regions.clear(); // Clear list after successful saving
-        Log.d(TAG, "Data saved successfully!");
+        Log.d(TAG, "Dados Salvos no Servidor!");
     }
 }

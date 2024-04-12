@@ -325,7 +325,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
                 // Iniciar uma nova thread para adicionar a região à lista
-                ConsultDatabase thread = new ConsultDatabase(regions, regionName, latitude, longitude, semaphore);
+                ConsultDatabase thread = new ConsultDatabase(this,regions, regionName, latitude, longitude, semaphore);
                 thread.start();
                 try {
                     // Aguardar até que a thread termine sua execução

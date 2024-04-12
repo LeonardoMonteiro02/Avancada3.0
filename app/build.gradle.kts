@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.avancada30"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -40,6 +40,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:19.0.0")
     implementation("com.google.android.libraries.places:places:3.1.0")
     implementation (project(":Biblioteca"))
+    implementation ("com.fasterxml.jackson.core:jackson-databind:2.12.3")
     implementation(libs.firebase.database)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
