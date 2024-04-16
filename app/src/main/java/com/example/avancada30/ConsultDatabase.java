@@ -32,25 +32,26 @@ import java.util.concurrent.Semaphore;
 
 public class ConsultDatabase extends Thread {
     private List<Region> regions;
-    private String locationName;
-    private double latitude;
-    private double longitude;
+    private String newName;
+    private double newlatitude;
+    private double newlongitude;
     private Semaphore semaphore;
     private DatabaseReference databaseReference = FirebaseDatabase.getInstance().getReference();
-    private Context contesto;
 
-    public ConsultDatabase(Context contesto, List<Region> regions, String locationName, double latitude, double longitude, Semaphore semaphore) {
+
+    public ConsultDatabase(List<Region> regions, String locationName, double latitude, double longitude, Semaphore semaphore) {
         this.regions = regions;
-        this.locationName = locationName;
-        this.latitude = latitude;
-        this.longitude = longitude;
+        this.newName = locationName;
+        this.newlatitude = latitude;
+        this.newlongitude = longitude;
         this.semaphore = semaphore;
-        this.contesto = contesto;
+
     }
 
     @Override
     public void run() {
-
+        Log.d("Consulta Banco de Dados", "Thread Inicializada");
+        Log.d("Consulta Banco de Dados", "Nova localização " + newName);
         consultarBanco();
     }
 
@@ -61,7 +62,6 @@ public class ConsultDatabase extends Thread {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
 
-                Log.d("Consulta Banco de Dados", "Inicializada");
                 for (DataSnapshot childSnapshot : snapshot.getChildren()) {
                     String name = childSnapshot.child("name").getValue(String.class);
                     double latitude = childSnapshot.child("latitude").getValue(Double.class);
@@ -71,10 +71,32 @@ public class ConsultDatabase extends Thread {
                     String key = childSnapshot.getKey();
                     int Chave = Integer.parseInt(key);
 
-                    Region region = new Region(name, latitude, longitude, timestamp, user);
+                    // Verifica se é uma SubRegion ou RestrictedRegion
+                    boolean isRestricted = childSnapshot.child("restricted").exists();
+                    boolean isMainRegion = childSnapshot.child("mainRegion").exists();
+
+                    Region region;
+                    if (isRestricted && isMainRegion) {
+                        Region mainRegion = getMainRegionFromChildSnapshot(childSnapshot.child("mainRegion"));
+                        region = new RestrictedRegion(name, latitude, longitude, user, timestamp, true, mainRegion);
+                    } else if (isMainRegion) {
+                        Region mainRegion = getMainRegionFromChildSnapshot(childSnapshot.child("mainRegion"));
+                        region = new SubRegion(name, latitude, longitude, user, timestamp, mainRegion);
+                    } else {
+                        region = new Region(name, latitude, longitude, timestamp, user);
+                    }
+
                     regionsFromDatabase.add(region);
                 }
                 processarRegioes(regionsFromDatabase);
+            }
+            private Region getMainRegionFromChildSnapshot(DataSnapshot snapshot) {
+                String name = snapshot.child("name").getValue(String.class);
+                double latitude = snapshot.child("latitude").getValue(Double.class);
+                double longitude = snapshot.child("longitude").getValue(Double.class);
+                Long timestamp = snapshot.child("timestamp").getValue(Long.class);
+                int user = Math.toIntExact(snapshot.child("user").getValue(Long.class));
+                return new Region(name, latitude, longitude, timestamp, user);
             }
 
             @Override
@@ -86,58 +108,194 @@ public class ConsultDatabase extends Thread {
     }
 
     private void processarRegioes(List<Region> regionsFromDatabase) {
-        Log.d("Consulta Banco de Dados", "Nome localização " + locationName);
         avaliaDados (regionsFromDatabase);
     }
 
-    private boolean checkRegionProximity(double latitude, double longitude, List<Region> regions) {
-        GeoCalculator cal = new GeoCalculator();
-        for (Region region : regions) {
-            double distance = cal.calculateDistance(region.getLatitude(), region.getLongitude(), latitude, longitude);
-            if (distance < 30) {
-                return true;
+
+
+    public void avaliaDados(List<Region> listaBD) {
+
+        int indexRegiaoMenorQue30 = -1;
+        for (int i = 0; i < listaBD.size(); i++) {
+            if (listaBD.get(i).getClass().equals(Region.class)) {
+                double distancia = listaBD.get(i).calculateDistance(listaBD.get(i).getLatitude(), listaBD.get(i).getLongitude(), newlatitude, newlongitude);
+                Log.d("Consulta Banco de Dados", "Distância da nova localização em relação a região " + i + ": " + distancia + " metros.");
+                if (distancia < 30) {
+                    indexRegiaoMenorQue30 = i;
+                    Log.d("Consulta Banco de Dados", "Proximidade de regiões encontrada.");
+                    break; // Se encontrarmos uma região a menos de 30 metros, podemos sair do loop
+                }
             }
         }
-        return false;
+        try {
+            semaphore.acquire();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        if (regions.isEmpty() && listaBD.isEmpty()) {
+            Log.d("Consulta Banco de Dados", "Nenhuma região próxima encontrada. Iniciando adição de região.");
+            semaphore.release();
+            Log.d("Consulta Banco de Dados", "Semafaro Liberado 1");
+            RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore);
+            thread.start();
+        } else if (regions.isEmpty() && !listaBD.isEmpty()) {
+            semaphore.release();
+            Log.d("Consulta Banco de Dados", "Semafaro Liberado 2");
+            analise(indexRegiaoMenorQue30,listaBD);
+
+        } else if (!regions.isEmpty() && listaBD.isEmpty()) {
+            semaphore.release();
+            Log.d("Consulta Banco de Dados", "Semafaro Liberado 3");
+            RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore,true);
+            thread.start();
+
+        } else if (!regions.isEmpty() && !listaBD.isEmpty()) {
+            semaphore.release();
+            Log.d("Consulta Banco de Dados", "Semafaro Liberado 4");
+            if (indexRegiaoMenorQue30 != -1){
+                analise(indexRegiaoMenorQue30,listaBD);
+            }
+            else {
+                RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore);
+                thread.start();
+            }
+
+        }
+
     }
 
-    public void avaliaDados (List<Region> listaBD){
-        double distancia;
-        boolean verificacao = false;
-        for (Region region : listaBD) {
-            if (region instanceof Region) {
-                distancia = region.calculateDistance(region.getLatitude(), region.getLongitude(), latitude, longitude);
-                if (distancia < 30) {
-                    verificacao = true;
+
+    private void analise(int indexRegiaoMenorQue30,List<Region> listaBD){
+
+        if (indexRegiaoMenorQue30 != -1) {  // New Região é menor que 30?
+            if (indexRegiaoMenorQue30 < listaBD.size() - 1) { // Menor região não é a ultima região da lista?
+                int indexProximaRegiaoRegion = -1;
+                for (int j = indexRegiaoMenorQue30 + 1; j < listaBD.size(); j++) {
+                    if (listaBD.get(j).getClass().equals(Region.class)) { // encontra a proxima region da lista se tiver.
+                        indexProximaRegiaoRegion = j;
+                        break;
+                    }
+                }
+                if (indexProximaRegiaoRegion != -1 && (indexProximaRegiaoRegion - 1) != indexRegiaoMenorQue30) { // Se for verdade verifica o tipo do ultimo elemento ante da proxima region
+                    Region regiaoAnterior = listaBD.get(indexProximaRegiaoRegion - 1);
+                    boolean avalia = false;
+                    for (int j = indexRegiaoMenorQue30 + 1; j < indexProximaRegiaoRegion; j++) {
+                        double distancia = listaBD.get(j).calculateDistance(listaBD.get(j).getLatitude(), listaBD.get(j).getLongitude(), newlatitude, newlongitude);
+                        if (listaBD.get(j).getClass().equals(Region.class)) { // encontra a proxima region da lista se tiver.
+                            if (distancia < 5) {
+                                avalia = true;
+                                break; // Se encontrarmos uma região a menos de 30 metros, podemos sair do loop
+                            }
+                        }
+                    }
+                    if (avalia == false) {
+
+                        if (regiaoAnterior.getClass().equals(SubRegion.class)) {
+                            double distancia = regiaoAnterior.calculateDistance(regiaoAnterior.getLatitude(), regiaoAnterior.getLongitude(), newlatitude, newlongitude);
+                            Log.d("Consulta Banco de Dados", "Distância da nova localização em relação a Subregião " + distancia + " metros.");
+                            if (distancia > 5) {
+                                Log.d("Consulta Banco de Dados", "Iniciando atualização da região restrita.");
+                                RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore, true, listaBD.get(indexRegiaoMenorQue30));
+                                thread.start();
+                            } else {
+                                Log.d("Consulta Banco de Dados", "Distancia menor que 5 metros da Subregião.");
+                            }
+                        } else if (regiaoAnterior.getClass().equals(RestrictedRegion.class)) {
+                            double distancia = regiaoAnterior.calculateDistance(regiaoAnterior.getLatitude(), regiaoAnterior.getLongitude(), newlatitude, newlongitude);
+                            Log.d("Consulta Banco de Dados", "Distância da nova localização em relação a região restrita: " + distancia + " metros.");
+                            if (distancia > 5) {
+                                Log.d("Consulta Banco de Dados", "Iniciando atualização da Subregião.");
+                                RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore, listaBD.get(indexRegiaoMenorQue30));
+                                thread.start();
+                            } else {
+                                Log.d("Consulta Banco de Dados", "Distancia menor que 5 metros da Região restrita.");
+                            }
+                        }
+                    }
+                    else {
+                        Log.d("Consulta Banco de Dados", "Distancia menor que 5 metros do intervalo de regiões.");
+                    }
+                }
+                else {
+                    Log.d("Consulta Banco de Dados", "Região encontrada é a última do Banco.");
+                    boolean avalia = false;
+                    for (int j = indexRegiaoMenorQue30 + 1; j < listaBD.size(); j++) {
+                        double distancia = listaBD.get(j).calculateDistance(listaBD.get(j).getLatitude(), listaBD.get(j).getLongitude(), newlatitude, newlongitude);
+                        if (listaBD.get(j).getClass().equals(Region.class)) { // encontra a proxima region da lista se tiver.
+                            if (distancia < 5) {
+                                avalia = true;
+                                break; // Se encontrarmos uma região a menos de 30 metros, podemos sair do loop
+                            }
+                        }
+                    }
+                    if (avalia == false){
+                        Region regiaoAnterior = listaBD.get(listaBD.size() - 1);
+                        if (regiaoAnterior.getClass().equals(SubRegion.class)) {
+                            double distancia = regiaoAnterior.calculateDistance(regiaoAnterior.getLatitude(), regiaoAnterior.getLongitude(), newlatitude, newlongitude);
+                            Log.d("Consulta Banco de Dados", "Distância da nova localização em relação a Subregião: " + distancia + " metros.");
+                            if (distancia > 5) {
+                                Log.d("Consulta Banco de Dados", "Iniciando atualização da região restrita.");
+                                RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore, true, listaBD.get(indexRegiaoMenorQue30));
+                                thread.start();
+                            } else {
+                                Log.d("Consulta Banco de Dados", "Distancia menor que 5 metros da Subregião.");
+                            }
+                        } else if (regiaoAnterior.getClass().equals(RestrictedRegion.class)) {
+                            double distancia = regiaoAnterior.calculateDistance(regiaoAnterior.getLatitude(), regiaoAnterior.getLongitude(), newlatitude, newlongitude);
+                            Log.d("Consulta Banco de Dados", "Distância da nova localização em relação a região restrita: " + distancia + " metros.");
+                            if (distancia > 5) {
+                                Log.d("Consulta Banco de Dados", "Iniciando atualização da Subregião.");
+                                RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore, listaBD.get(indexRegiaoMenorQue30));
+                                thread.start();
+                            } else {
+                                Log.d("Consulta Banco de Dados", "Distancia menor que 5 metros da Região restrita.");
+                            }
+                        }
+                    }
+                    else{
+                        Log.d("Consulta Banco de Dados", "Distancia menor que 5 metros de alguma das regiões.");
+                    }
+                }
+            } else {
+                Log.d("Consulta Banco de Dados", "Iniciando atualização da Subregião.");
+                if (listaBD.get(indexRegiaoMenorQue30).getClass().equals(Region.class)) {
+                    RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore, listaBD.get(indexRegiaoMenorQue30));
+                    thread.start();
+                } else if (listaBD.get(indexRegiaoMenorQue30).getClass().equals(SubRegion.class)) {
+                    double distancia = listaBD.get(indexRegiaoMenorQue30).calculateDistance(listaBD.get(indexRegiaoMenorQue30).getLatitude(), listaBD.get(indexRegiaoMenorQue30).getLongitude(), newlatitude, newlongitude);
+                    Log.d("Consulta Banco de Dados", "Distância da nova localização em relação a Subregião: " + distancia + " metros.");
+                    if (distancia > 5) {
+                        Log.d("Consulta Banco de Dados", "Iniciando atualização da região restrita.");
+                        SubRegion subRegiao = (SubRegion) listaBD.get(indexRegiaoMenorQue30);
+                        Region regiaoPrincipal = subRegiao.getMainRegion();
+                        RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore, true, regiaoPrincipal);
+                        thread.start();
+                    }
+                    else{
+                        Log.d("Consulta Banco de Dados", "Distancia menor que 5 metros da Subregião.");
+                    }
+                } else if (listaBD.get(indexRegiaoMenorQue30).getClass().equals(RestrictedRegion.class)) {
+                    double distancia = listaBD.get(indexRegiaoMenorQue30).calculateDistance(listaBD.get(indexRegiaoMenorQue30).getLatitude(), listaBD.get(indexRegiaoMenorQue30).getLongitude(), newlatitude, newlongitude);
+                    Log.d("Consulta Banco de Dados", "Distância da nova localização em relação a região restrita: " + distancia + " metros.");
+                    if (distancia > 5) {
+                        Log.d("Consulta Banco de Dados", "Iniciando atualização da Subregião.");
+                        RestrictedRegion restrictedRegion = (RestrictedRegion) listaBD.get(indexRegiaoMenorQue30);
+                        Region regiaoPrincipal = restrictedRegion.getMainRegion();
+                        RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore, regiaoPrincipal);
+                        thread.start();
+                    }
+                    else{
+                        Log.d("Consulta Banco de Dados", "Distancia menor que 5 metros da Restrita região.");
+                    }
                 }
             }
 
-        }
-        if (verificacao == true) {
-            Region ultimoObjeto = listaBD.get(listaBD.size() - 1);
-            if (ultimoObjeto instanceof Region) {
-                RegionUpdaterThread thread = new RegionUpdaterThread(contesto,regions, locationName, latitude, longitude, semaphore);
-                thread.start();
-            } else if (ultimoObjeto instanceof SubRegion) {
-                distancia = ultimoObjeto.calculateDistance(ultimoObjeto.getLatitude(), ultimoObjeto.getLongitude(), latitude, longitude);
-                if (distancia > 5) {
-                    RegionUpdaterThread thread = new RegionUpdaterThread(contesto,regions, locationName, latitude, longitude, semaphore);
-                    thread.start();
-                }
-            } else if (ultimoObjeto instanceof RestrictedRegion) {
-                distancia = ultimoObjeto.calculateDistance(ultimoObjeto.getLatitude(), ultimoObjeto.getLongitude(), latitude, longitude);
-                if (distancia > 5) {
-                    RegionUpdaterThread thread = new RegionUpdaterThread(contesto,regions, locationName, latitude, longitude, semaphore);
-                    thread.start();
-                }
-
-            }
-
-        }
-        else {
-
-            RegionUpdaterThread thread = new RegionUpdaterThread(contesto,regions, locationName, latitude, longitude, semaphore);
+        } else {
+            Log.d("Consulta Banco de Dados", "Nenhuma região próxima encontrada. Iniciando adição de região.");
+            RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore);
             thread.start();
         }
     }
 }
+
