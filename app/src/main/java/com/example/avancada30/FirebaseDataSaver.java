@@ -3,6 +3,7 @@ package com.example.avancada30;
 import android.content.Context;
 import android.util.Log;
 
+import com.example.biblioteca.Region;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
@@ -79,11 +80,13 @@ public class FirebaseDataSaver extends Thread {
     }
 
     private void saveData() {
+        String encryptedJson;
         DatabaseReference regiao = referencia.child("regioes");
 
 
         for (Region region : regions) {
-            regiao.child(String.valueOf(i)).setValue(region);
+            encryptedJson = JsonConverter.objectToJsonEncrypted(region);
+            regiao.child(String.valueOf(i)).setValue(encryptedJson);
             i++;
         }
 

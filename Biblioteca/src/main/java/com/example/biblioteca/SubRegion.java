@@ -1,4 +1,4 @@
-package com.example.avancada30;
+package com.example.biblioteca;
 
 public class SubRegion extends Region {
     private Region mainRegion;
@@ -13,6 +13,17 @@ public class SubRegion extends Region {
     }
     public void setMainRegion(Region mainRegion){
         this.mainRegion = mainRegion;
+    }
+    @Override
+    public String toString() {
+        return "SubRegion{" +
+                "name='" + getName() + '\'' +
+                ", latitude=" + getLatitude() +
+                ", longitude=" + getLongitude() +
+                ", timestamp=" + getTimestamp() +
+                ", user=" + getuser() +
+                ", mainRegion=" + mainRegion.toString() +
+                '}';
     }
 }
 

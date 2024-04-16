@@ -16,16 +16,25 @@
 
 package com.example.avancada30;
 
+
+
 import android.content.Context;
 import android.util.Log;
 import androidx.annotation.NonNull;
 
 import com.example.biblioteca.GeoCalculator;
+import com.example.biblioteca.Region;
+import com.example.biblioteca.RestrictedRegion;
+import com.example.biblioteca.SubRegion;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Semaphore;
@@ -61,33 +70,122 @@ public class ConsultDatabase extends Thread {
         regioesRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-
                 for (DataSnapshot childSnapshot : snapshot.getChildren()) {
-                    String name = childSnapshot.child("name").getValue(String.class);
-                    double latitude = childSnapshot.child("latitude").getValue(Double.class);
-                    double longitude = childSnapshot.child("longitude").getValue(Double.class);
-                    Long timestamp = childSnapshot.child("timestamp").getValue(Long.class);
-                    int user = Math.toIntExact(childSnapshot.child("user").getValue(Long.class));
-                    String key = childSnapshot.getKey();
-                    int Chave = Integer.parseInt(key);
+                    try {
+                        JSONObject encryptedData = new JSONObject(childSnapshot.getValue(String.class));
 
-                    // Verifica se é uma SubRegion ou RestrictedRegion
-                    boolean isRestricted = childSnapshot.child("restricted").exists();
-                    boolean isMainRegion = childSnapshot.child("mainRegion").exists();
+                        // Verificar se é uma Região simples
+                        if (encryptedData.has("latitude") && encryptedData.has("longitude") &&
+                                encryptedData.has("name") && encryptedData.has("timestamp") &&
+                                encryptedData.has("user")) {
 
-                    Region region;
-                    if (isRestricted && isMainRegion) {
-                        Region mainRegion = getMainRegionFromChildSnapshot(childSnapshot.child("mainRegion"));
-                        region = new RestrictedRegion(name, latitude, longitude, user, timestamp, true, mainRegion);
-                    } else if (isMainRegion) {
-                        Region mainRegion = getMainRegionFromChildSnapshot(childSnapshot.child("mainRegion"));
-                        region = new SubRegion(name, latitude, longitude, user, timestamp, mainRegion);
-                    } else {
-                        region = new Region(name, latitude, longitude, timestamp, user);
+                            String encryptedLatitude = encryptedData.getString("latitude");
+                            String encryptedLongitude = encryptedData.getString("longitude");
+                            String encryptedName = encryptedData.getString("name");
+                            String encryptedTimestamp = encryptedData.getString("timestamp");
+                            String encryptedUser = encryptedData.getString("user");
+
+                            // Descriptografar os valores dos atributos
+                            String latitude = CriptografiaAES.descriptografar(encryptedLatitude);
+                            String longitude = CriptografiaAES.descriptografar(encryptedLongitude);
+                            String name = CriptografiaAES.descriptografar(encryptedName);
+                            Long timestamp = Long.valueOf(CriptografiaAES.descriptografar(encryptedTimestamp));
+                            int user = Integer.parseInt(CriptografiaAES.descriptografar(encryptedUser));
+
+                            // Construir o objeto Region com os valores descriptografados
+                            Region region = new Region(name, Double.parseDouble(latitude), Double.parseDouble(longitude), timestamp, user);
+
+                            // Adicionar a região reconstruída à lista de regiões
+                            regionsFromDatabase.add(region);
+                        }
+                        // Verificar se é uma Região Restrita
+                        else if (encryptedData.has("restricted") && encryptedData.has("mainRegion")) {
+                            String encryptedRestricted = encryptedData.getString("restricted");
+                            boolean restricted = Boolean.parseBoolean(CriptografiaAES.descriptografar(encryptedRestricted));
+
+                            JSONObject encryptedMainRegion = encryptedData.getJSONObject("mainRegion");
+
+                            // Reconstruir o objeto da região principal
+                            String encryptedMainRegionLatitude = encryptedMainRegion.getString("latitude");
+                            String encryptedMainRegionLongitude = encryptedMainRegion.getString("longitude");
+                            String encryptedMainRegionName = encryptedMainRegion.getString("name");
+                            String encryptedMainRegionTimestamp = encryptedMainRegion.getString("timestamp");
+                            String encryptedMainRegionUser = encryptedMainRegion.getString("user");
+
+                            String encryptedLatitude = encryptedData.getString("latitude");
+                            String encryptedLongitude = encryptedData.getString("longitude");
+                            String encryptedName = encryptedData.getString("name");
+                            String encryptedTimestamp = encryptedData.getString("timestamp");
+                            String encryptedUser = encryptedData.getString("user");
+
+                            // Descriptografar os valores dos atributos
+                            String latitude = CriptografiaAES.descriptografar(encryptedLatitude);
+                            String longitude = CriptografiaAES.descriptografar(encryptedLongitude);
+                            String name = CriptografiaAES.descriptografar(encryptedName);
+                            Long timestamp = Long.valueOf(CriptografiaAES.descriptografar(encryptedTimestamp));
+                            int user = Integer.parseInt(CriptografiaAES.descriptografar(encryptedUser));
+
+                            // Descriptografar os valores dos atributos da região principal
+                            String mainRegionLatitude = CriptografiaAES.descriptografar(encryptedMainRegionLatitude);
+                            String mainRegionLongitude = CriptografiaAES.descriptografar(encryptedMainRegionLongitude);
+                            String mainRegionName = CriptografiaAES.descriptografar(encryptedMainRegionName);
+                            Long mainRegionTimestamp = Long.valueOf(CriptografiaAES.descriptografar(encryptedMainRegionTimestamp));
+                            int mainRegionUser = Integer.parseInt(CriptografiaAES.descriptografar(encryptedMainRegionUser));
+
+                            // Construir o objeto da região principal
+                            Region mainRegion = new Region(mainRegionName, Double.parseDouble(mainRegionLatitude), Double.parseDouble(mainRegionLongitude), mainRegionTimestamp, mainRegionUser);
+
+                            // Construir o objeto RestrictedRegion com os valores descriptografados
+                            RestrictedRegion restrictedRegion = new RestrictedRegion(name, Double.parseDouble(latitude), Double.parseDouble(longitude), user, timestamp, restricted, mainRegion);
+
+                            // Adicionar a região restrita reconstruída à lista de regiões
+                            regionsFromDatabase.add(restrictedRegion);
+                        }
+                        // Verificar se é uma Sub-Região
+                        else if (encryptedData.has("mainRegion")) {
+                            JSONObject encryptedMainRegion = encryptedData.getJSONObject("mainRegion");
+
+                            // Reconstruir o objeto da região principal
+                            String encryptedMainRegionLatitude = encryptedMainRegion.getString("latitude");
+                            String encryptedMainRegionLongitude = encryptedMainRegion.getString("longitude");
+                            String encryptedMainRegionName = encryptedMainRegion.getString("name");
+                            String encryptedMainRegionTimestamp = encryptedMainRegion.getString("timestamp");
+                            String encryptedMainRegionUser = encryptedMainRegion.getString("user");
+
+                            // Descriptografar os valores dos atributos da região principal
+                            String mainRegionLatitude = CriptografiaAES.descriptografar(encryptedMainRegionLatitude);
+                            String mainRegionLongitude = CriptografiaAES.descriptografar(encryptedMainRegionLongitude);
+                            String mainRegionName = CriptografiaAES.descriptografar(encryptedMainRegionName);
+                            Long mainRegionTimestamp = Long.valueOf(CriptografiaAES.descriptografar(encryptedMainRegionTimestamp));
+                            int mainRegionUser = Integer.parseInt(CriptografiaAES.descriptografar(encryptedMainRegionUser));
+
+                            String encryptedLatitude = encryptedData.getString("latitude");
+                            String encryptedLongitude = encryptedData.getString("longitude");
+                            String encryptedName = encryptedData.getString("name");
+                            String encryptedTimestamp = encryptedData.getString("timestamp");
+                            String encryptedUser = encryptedData.getString("user");
+
+                            // Descriptografar os valores dos atributos
+                            String latitude = CriptografiaAES.descriptografar(encryptedLatitude);
+                            String longitude = CriptografiaAES.descriptografar(encryptedLongitude);
+                            String name = CriptografiaAES.descriptografar(encryptedName);
+                            Long timestamp = Long.valueOf(CriptografiaAES.descriptografar(encryptedTimestamp));
+                            int user = Integer.parseInt(CriptografiaAES.descriptografar(encryptedUser));
+
+                            // Construir o objeto da região principal
+                            Region mainRegion = new Region(mainRegionName, Double.parseDouble(mainRegionLatitude), Double.parseDouble(mainRegionLongitude), mainRegionTimestamp, mainRegionUser);
+
+                            // Construir o objeto SubRegion com os valores descriptografados
+                            SubRegion subRegion = new SubRegion(name, Double.parseDouble(latitude), Double.parseDouble(longitude), user, timestamp, mainRegion);
+
+                            // Adicionar a sub-região reconstruída à lista de regiões
+                            regionsFromDatabase.add(subRegion);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-
-                    regionsFromDatabase.add(region);
                 }
+
                 processarRegioes(regionsFromDatabase);
             }
             private Region getMainRegionFromChildSnapshot(DataSnapshot snapshot) {
@@ -108,6 +206,7 @@ public class ConsultDatabase extends Thread {
     }
 
     private void processarRegioes(List<Region> regionsFromDatabase) {
+        Log.d("Consulta Banco de Dados", "Região do banco " + regionsFromDatabase.size());
         avaliaDados (regionsFromDatabase);
     }
 
@@ -182,12 +281,12 @@ public class ConsultDatabase extends Thread {
                     boolean avalia = false;
                     for (int j = indexRegiaoMenorQue30 + 1; j < indexProximaRegiaoRegion; j++) {
                         double distancia = listaBD.get(j).calculateDistance(listaBD.get(j).getLatitude(), listaBD.get(j).getLongitude(), newlatitude, newlongitude);
-                        if (listaBD.get(j).getClass().equals(Region.class)) { // encontra a proxima region da lista se tiver.
+
                             if (distancia < 5) {
                                 avalia = true;
-                                break; // Se encontrarmos uma região a menos de 30 metros, podemos sair do loop
+                                break;
                             }
-                        }
+
                     }
                     if (avalia == false) {
 
@@ -222,17 +321,19 @@ public class ConsultDatabase extends Thread {
                     boolean avalia = false;
                     for (int j = indexRegiaoMenorQue30 + 1; j < listaBD.size(); j++) {
                         double distancia = listaBD.get(j).calculateDistance(listaBD.get(j).getLatitude(), listaBD.get(j).getLongitude(), newlatitude, newlongitude);
-                        if (listaBD.get(j).getClass().equals(Region.class)) { // encontra a proxima region da lista se tiver.
-                            if (distancia < 5) {
-                                avalia = true;
-                                break; // Se encontrarmos uma região a menos de 30 metros, podemos sair do loop
-                            }
+
+                        if (distancia < 5) {
+                            avalia = true;
+                            break; // Se encontrarmos uma região a menos de 30 metros, podemos sair do loop
                         }
+
                     }
                     if (avalia == false){
-                        Region regiaoAnterior = listaBD.get(listaBD.size() - 1);
-                        if (regiaoAnterior.getClass().equals(SubRegion.class)) {
-                            double distancia = regiaoAnterior.calculateDistance(regiaoAnterior.getLatitude(), regiaoAnterior.getLongitude(), newlatitude, newlongitude);
+                        Log.d("Consulta Banco de Dados", "Região encontrada esta a mais de 5 metros.");
+
+                        Log.d("Consulta Banco de Dados", "ultimama região: " + (listaBD.size() - 1));
+                        if (listaBD.get(listaBD.size() - 1).getClass().equals(SubRegion.class)) {
+                            double distancia = listaBD.get(listaBD.size() - 1).calculateDistance(listaBD.get(listaBD.size() - 1).getLatitude(), listaBD.get(listaBD.size() - 1).getLongitude(), newlatitude, newlongitude);
                             Log.d("Consulta Banco de Dados", "Distância da nova localização em relação a Subregião: " + distancia + " metros.");
                             if (distancia > 5) {
                                 Log.d("Consulta Banco de Dados", "Iniciando atualização da região restrita.");
@@ -241,8 +342,8 @@ public class ConsultDatabase extends Thread {
                             } else {
                                 Log.d("Consulta Banco de Dados", "Distancia menor que 5 metros da Subregião.");
                             }
-                        } else if (regiaoAnterior.getClass().equals(RestrictedRegion.class)) {
-                            double distancia = regiaoAnterior.calculateDistance(regiaoAnterior.getLatitude(), regiaoAnterior.getLongitude(), newlatitude, newlongitude);
+                        } else if (listaBD.get(listaBD.size() - 1).getClass().equals(RestrictedRegion.class)) {
+                            double distancia = listaBD.get(listaBD.size() - 1).calculateDistance(listaBD.get(listaBD.size() - 1).getLatitude(), listaBD.get(listaBD.size() - 1).getLongitude(), newlatitude, newlongitude);
                             Log.d("Consulta Banco de Dados", "Distância da nova localização em relação a região restrita: " + distancia + " metros.");
                             if (distancia > 5) {
                                 Log.d("Consulta Banco de Dados", "Iniciando atualização da Subregião.");

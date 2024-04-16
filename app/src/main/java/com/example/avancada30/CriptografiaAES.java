@@ -19,6 +19,9 @@ public class CriptografiaAES {
     }
 
     public static String descriptografar(String textoCriptografado) throws Exception {
+        if (textoCriptografado == null) {
+            return null;
+        }
         SecretKeySpec chave = new SecretKeySpec(CHAVE_SECRETA.getBytes(), ALGORITHM);
         Cipher cipher = Cipher.getInstance(TRANSFORMATION);
         cipher.init(Cipher.DECRYPT_MODE, chave);
@@ -26,7 +29,6 @@ public class CriptografiaAES {
         byte[] textoDescriptografado = cipher.doFinal(textoBytes);
         return new String(textoDescriptografado, "UTF-8");
     }
-
     // public static void main(String[] args) {
     // try {
     // String textoOriginal = "Oi leo seu lindo";

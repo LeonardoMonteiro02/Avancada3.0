@@ -2,66 +2,67 @@ package com.example.avancada30;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.ArrayList;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Iterator;
+
 public class JsonConverter {
     private static ObjectMapper objectMapper = new ObjectMapper();
 
-    // Método para converter um objeto para JSON
-    public static String objectToJson(Object obj) {
+    // Método para converter um objeto para JSON com criptografia dos valores dos atributos
+    public static String objectToJsonEncrypted(Object obj) {
         try {
-            return objectMapper.writeValueAsString(obj);
-        } catch (JsonProcessingException e) {
+            // Convertendo o objeto para JSON
+            String json = objectMapper.writeValueAsString(obj);
+
+            // Convertendo o JSON para um objeto JSON
+            JSONObject jsonObject = new JSONObject(json);
+
+            // Iterando sobre as chaves do objeto JSON
+            Iterator<String> keys = jsonObject.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                // Verificando se o valor associado à chave é um objeto JSON
+                if (jsonObject.get(key) instanceof JSONObject) {
+                    // Se for um objeto JSON, iteramos sobre as suas chaves
+                    JSONObject innerObject = jsonObject.getJSONObject(key);
+                    Iterator<String> innerKeys = innerObject.keys();
+                    while (innerKeys.hasNext()) {
+                        String innerKey = innerKeys.next();
+                        // Criptografando o valor associado à chave do objeto interno
+                        String encryptedValue = CriptografiaAES.criptografar(innerObject.get(innerKey).toString());
+                        // Substituindo o valor original pelo valor criptografado
+                        innerObject.put(innerKey, encryptedValue);
+                    }
+                } else {
+                    // Criptografando o valor associado à chave
+                    String encryptedValue = CriptografiaAES.criptografar(jsonObject.get(key).toString());
+                    // Substituindo o valor original pelo valor criptografado
+                    jsonObject.put(key, encryptedValue);
+                }
+            }
+
+            // Convertendo o objeto JSON modificado de volta para uma string JSON
+            return jsonObject.toString();
+        } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
     }
 
-    // Método para converter JSON de volta para um objeto
-    public static <T> T jsonToObject(String json, Class<T> clazz) {
+    // Método para converter JSON criptografado de volta para um objeto
+    public static <T> T jsonToObjectDecrypted(String encryptedJson, Class<T> clazz) {
         try {
+            // Descriptografando o JSON
+            String json = CriptografiaAES.descriptografar(encryptedJson);
+
+            // Convertendo o JSON de volta para o objeto
             return objectMapper.readValue(json, clazz);
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
-    }
-
-    // Método para converter um atributo de um objeto para uma string JSON
-    public static String attributeToJson(Object attribute) {
-        JSONObject jsonObject = new JSONObject();
-        try {
-            jsonObject.put("attribute", attribute);
-        } catch (JSONException e) {
-            throw new RuntimeException(e);
-        }
-        return jsonObject.toString();
-    }
-
-    // Método para converter uma string JSON em um atributo de um objeto
-    public static Object jsonToAttribute(String jsonString) {
-        JSONObject jsonObject = null;
-        try {
-            jsonObject = new JSONObject(jsonString);
-        } catch (JSONException e) {
-            throw new RuntimeException(e);
-        }
-        try {
-            return jsonObject.get("attribute");
-        } catch (JSONException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static void main(String[] args) {
-        // Exemplo de uso
-        String jsonString = attributeToJson(42); // Substitua 42 pelo seu atributo
-        System.out.println("Atributo em formato JSON: " + jsonString);
-
-        Object attribute = jsonToAttribute(jsonString);
-        System.out.println("Atributo recuperado: " + attribute);
     }
 }

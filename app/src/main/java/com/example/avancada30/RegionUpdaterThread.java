@@ -22,6 +22,9 @@ import android.content.Intent;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.example.biblioteca.Region;
+import com.example.biblioteca.RestrictedRegion;
+import com.example.biblioteca.SubRegion;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.example.biblioteca.GeoCalculator;
@@ -97,7 +100,7 @@ public class RegionUpdaterThread extends Thread {
     @Override
     public void run() {
 
-            // Adquira a permissão do semáforo antes de acessar a lista
+        // Adquira a permissão do semáforo antes de acessar a lista
         try {
             semaphore.acquire();
         } catch (InterruptedException e) {
@@ -238,12 +241,12 @@ public class RegionUpdaterThread extends Thread {
                     boolean avalia = false;
                     for (int j = indexRegiaoMenorQue30 + 1; j < lista.size(); j++) {
                         double distancia = lista.get(j).calculateDistance(lista.get(j).getLatitude(), lista.get(j).getLongitude(), newlatitude, newlongitude);
-                        if (lista.get(j).getClass().equals(Region.class)) { // encontra a proxima region da lista se tiver.
-                            if (distancia < 5) {
-                                avalia = true;
-                                break; // Se encontrarmos uma região a menos de 30 metros, podemos sair do loop
-                            }
+
+                        if (distancia < 5) {
+                            avalia = true;
+                            break; // Se encontrarmos uma região a menos de 30 metros, podemos sair do loop
                         }
+
                     }
                     if (avalia == false){
                         Region regiaoAnterior = lista.get(lista.size() - 1);

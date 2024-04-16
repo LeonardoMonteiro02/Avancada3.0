@@ -17,19 +17,16 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
 
+import com.example.biblioteca.Region;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.libraries.places.api.Places;
-import com.google.android.libraries.places.api.net.PlacesClient;
 import com.google.android.libraries.places.widget.Autocomplete;
 import com.google.android.libraries.places.widget.AutocompleteActivity;
 import com.google.android.libraries.places.widget.model.AutocompleteActivityMode;
@@ -221,7 +218,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
 
             // Move a câmera do mapa para a nova posição com um nível de zoom de 15
-            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15));
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 18));
         }
     }
 
