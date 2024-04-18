@@ -89,7 +89,7 @@ public class FirebaseDataSaver extends Thread {
             regiao.child(String.valueOf(i)).setValue(encryptedJson);
             i++;
         }
-
+        i=0;
         regions.clear(); // Clear list after successful saving
         Log.d(TAG, "Dados Salvos no Servidor!");
     }

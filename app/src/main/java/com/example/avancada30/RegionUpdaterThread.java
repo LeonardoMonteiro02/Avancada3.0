@@ -29,8 +29,11 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.example.biblioteca.GeoCalculator;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 
 public class RegionUpdaterThread extends Thread {
@@ -47,10 +50,12 @@ public class RegionUpdaterThread extends Thread {
     private Region region = null;
     private  SubRegion subRegion = null;
     private boolean bancovasio = false;
+    private List<Region> listaBD = new ArrayList<>();
+    private int index;
 
 
 
-    public RegionUpdaterThread( List<Region> regions, String locationName, double latitude, double longitude, Semaphore semaphore, boolean restricted, Region mainRegion) {
+    public RegionUpdaterThread( List<Region> regions, List<Region> listaBD, int index,String locationName, double latitude, double longitude, Semaphore semaphore, boolean restricted, Region mainRegion) {
         this.regions = regions;
         this.newName = locationName;
         this.newlatitude = latitude;
@@ -58,34 +63,41 @@ public class RegionUpdaterThread extends Thread {
         this.semaphore = semaphore;
         this.restricted = restricted;
         this.mainRegion = mainRegion;
+        this.listaBD = listaBD;
+        this.index = index;
         this.restrictedRegion = new RestrictedRegion(locationName, latitude, longitude, Math.abs(random.nextInt()), System.nanoTime(), restricted, mainRegion);
 
     }
-    public RegionUpdaterThread( List<Region> regions, String locationName, double latitude, double longitude, Semaphore semaphore, Region mainRegion) {
+    public RegionUpdaterThread( List<Region> regions,List<Region> listaBD, int index, String locationName, double latitude, double longitude, Semaphore semaphore, Region mainRegion) {
         this.regions = regions;
         this.newName = locationName;
         this.newlatitude = latitude;
         this.newlongitude = longitude;
         this.semaphore = semaphore;
         this.mainRegion = mainRegion;
+        this.listaBD = listaBD;
+        this.index = index;
         this.subRegion = new SubRegion(locationName, latitude, longitude, Math.abs(random.nextInt()), System.nanoTime(), mainRegion);
 
     }
-    public RegionUpdaterThread( List<Region> regions, String locationName, double latitude, double longitude, Semaphore semaphore) {
+    public RegionUpdaterThread( List<Region> regions,List<Region> listaBD, String locationName, double latitude, double longitude, Semaphore semaphore) {
         this.regions = regions;
         this.newName = locationName;
         this.newlatitude = latitude;
         this.newlongitude = longitude;
         this.semaphore = semaphore;
+        this.listaBD = listaBD;
+        this.index = index;
         this.region = new Region(locationName, latitude, longitude, System.nanoTime(), Math.abs(random.nextInt()));
     }
-    public RegionUpdaterThread( List<Region> regions, String locationName, double latitude, double longitude, Semaphore semaphore,boolean bancovasio) {
+    public RegionUpdaterThread( List<Region> regions,List<Region> listaBD, String locationName, double latitude, double longitude, Semaphore semaphore,boolean bancovasio) {
         this.regions = regions;
         this.newName = locationName;
         this.newlatitude = latitude;
         this.newlongitude = longitude;
         this.semaphore = semaphore;
         this.bancovasio = bancovasio;
+        this.listaBD = listaBD;
         this.region = new Region(locationName, latitude, longitude, System.nanoTime(), Math.abs(random.nextInt()));
 
     }
@@ -126,17 +138,38 @@ public class RegionUpdaterThread extends Thread {
         } else if (regions.isEmpty() && bancovasio == false) {
             Log.d("Consulta Lista", " Lista Vazia e Banco Cheio ");
             if (restrictedRegion != null) {
-                regions.add(restrictedRegion);
+                listaBD.add(index+1,restrictedRegion);
+                listaBD.addAll(regions);
+                regions.clear();
+                regions.addAll(listaBD);
+                System.out.println("Elementos da lista Banco:");
+                imprimirElementos(listaBD);
+                System.out.println("Elementos da lista:");
+                imprimirElementos(regions);
                 Log.d("Consulta Lista", "Região restrita adicionada: " + restrictedRegion.getName());
                 restrictedRegion = null;
             }
             if (region != null) {
-                regions.add(region);
+                listaBD.add(region);
+                listaBD.addAll(regions);
+                regions.clear();
+                regions.addAll(listaBD);
+                System.out.println("Elementos da lista Banco:");
+                imprimirElementos(listaBD);
+                System.out.println("Elementos da lista:");
+                imprimirElementos(regions);
                 Log.d("Consulta Lista", "Região adicionada: " + region.getName());
                 region=null;
             }
             if (subRegion != null) {
-                regions.add(subRegion);
+                listaBD.add(index+1,subRegion);
+                listaBD.addAll(regions);
+                regions.clear();
+                regions.addAll(listaBD);
+                System.out.println("Elementos da lista Banco:");
+                imprimirElementos(listaBD);
+                System.out.println("Elementos da lista:");
+                imprimirElementos(regions);
                 Log.d("Consulta Lista", "Sub-região adicionada: " + subRegion.getName());
                 subRegion = null;
             }
@@ -153,12 +186,21 @@ public class RegionUpdaterThread extends Thread {
             if (restrictedRegion != null && region != null && subRegion != null && bancovasio == false) {
                 verificaLista(regions);
             }
+            if (restrictedRegion != null) {
+                regions.add(buscarIndiceElemento(regions,listaBD.get(index))+1,restrictedRegion);
+                System.out.println("Elementos da lista:");
+                imprimirElementos(regions);
+                Log.d("Consulta Lista", "Região restrita adicionada: " + restrictedRegion.getName());
+                restrictedRegion = null;
+            }
             if (region != null) {
-                regions.add(region);
-                region=null;
+                verificaLista(regions);
             }
             if (subRegion != null) {
-                regions.add(subRegion);
+                regions.add(buscarIndiceElemento(regions,listaBD.get(index))+1,subRegion);
+                System.out.println("Elementos da lista:");
+                imprimirElementos(regions);
+                Log.d("Consulta Lista", "Sub-região adicionada: " + subRegion.getName());
                 subRegion = null;
             }
             semaphore.release();
@@ -182,7 +224,9 @@ public class RegionUpdaterThread extends Thread {
             if (indexRegiaoMenorQue30 == lista.size() - 1) {
                 Log.d("Consulta Lista", "Adicionando SubRegion (Último elemento da lista)");
                 SubRegion newSubRegion = new SubRegion(newName, newlatitude, newlongitude, Math.abs(random.nextInt()), System.nanoTime(), lista.get(indexRegiaoMenorQue30));
-                lista.add(newSubRegion);
+                regions.add(indexRegiaoMenorQue30 +1,newSubRegion);
+                System.out.println("Elementos da lista:");
+                imprimirElementos(regions);
             } else {
 
                 boolean avalia = false;
@@ -213,7 +257,10 @@ public class RegionUpdaterThread extends Thread {
         } else {
             Log.d("Consulta Lista", "Nenhuma região da lista está a menos de 30 metros de distância do novo dado");
             Region newRegion = new Region(newName, newlatitude, newlongitude, System.nanoTime(), Math.abs(random.nextInt()));
-            lista.add(newRegion);
+            regions.add(newRegion);
+            listaBD.addAll(regions);
+            regions.clear();
+            regions.addAll(listaBD);
         }
     }
 
@@ -223,13 +270,24 @@ public class RegionUpdaterThread extends Thread {
             SubRegion subregion = (SubRegion)lista.get(index);
             Region mainRegion = subregion.getMainRegion();
             RestrictedRegion restrictedRegion = new RestrictedRegion(newName, newlatitude, newlongitude, Math.abs(random.nextInt()), System.nanoTime(), true, mainRegion);
-            lista.add(restrictedRegion);
-        } else {
+            regions.add(index +1,restrictedRegion);
+            System.out.println("Elementos da lista:");
+            imprimirElementos(regions);
+        } else if ("RestrictedRegion".equals(nomeSimplesUltimoElemento(lista, index))){
             Log.d("Consulta Lista", "Adicionando SubRegion");
             RestrictedRegion restrictedRegion = (RestrictedRegion) lista.get(index);
             Region mainRegion = restrictedRegion.getMainRegion();
             SubRegion subRegion = new SubRegion(newName, newlatitude, newlongitude, Math.abs(random.nextInt()), System.nanoTime(), mainRegion);
-            lista.add(subRegion);
+            regions.add(index +1,subRegion);
+            System.out.println("Elementos da lista:");
+            imprimirElementos(regions);
+        }else{
+            Log.d("Consulta Lista", "Adicionando SubRegion");
+            Region mainRegion = lista.get(index);
+            SubRegion subRegion = new SubRegion(newName, newlatitude, newlongitude, Math.abs(random.nextInt()), System.nanoTime(), mainRegion);
+            regions.add(index +1,subRegion);
+            System.out.println("Elementos da lista:");
+            imprimirElementos(regions);
         }
     }
 
@@ -242,5 +300,19 @@ public class RegionUpdaterThread extends Thread {
         }
     }
 
+    public static void imprimirElementos(List<Region> lista) {
+
+        for (Region elemento : lista) {
+            Log.d("Consulta Lista", "Tipo: " + nomeSimplesUltimoElemento(lista, lista.lastIndexOf(elemento)));
+        }
+    }
+    public static <T> int buscarIndiceElemento(List<T> lista, T elemento) {
+        for (int i = 0; i < lista.size(); i++) {
+            if (lista.get(i).equals(elemento)) {
+                return i; // Retorna o índice se o elemento for encontrado
+            }
+        }
+        return -1; // Retorna -1 se o elemento não for encontrado na lista
+    }
 
 }

@@ -214,12 +214,12 @@ public class ConsultDatabase extends Thread {
         if(regions.isEmpty() && listaBD.isEmpty()){
             Log.d("Consulta Banco de Dados", " Lista e Banco Vazios ");
             semaphore.release();
-            RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore,true);
+            RegionUpdaterThread thread = new RegionUpdaterThread(regions,listaBD, newName, newlatitude, newlongitude, semaphore,true);
             thread.start();
         } else if(!regions.isEmpty() && listaBD.isEmpty()){
             Log.d("Consulta Banco de Dados", " Lista Cheia e Banco Vazio ");
             semaphore.release();
-            RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore,true);
+            RegionUpdaterThread thread = new RegionUpdaterThread(regions,listaBD, newName, newlatitude, newlongitude, semaphore,true);
             thread.start();
         }else if (regions.isEmpty() && !listaBD.isEmpty()){
             Log.d("Consulta Banco de Dados", " Lista Vazia e Banco Cheio ");
@@ -242,7 +242,7 @@ public class ConsultDatabase extends Thread {
             if (verifica == true){
                 verificaBanco(listaBD);
             }else{ // passa somente os dados.
-                RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore,false);
+                RegionUpdaterThread thread = new RegionUpdaterThread(regions,listaBD, newName, newlatitude, newlongitude, semaphore,false);
                 thread.start();
             }
         }
@@ -263,7 +263,7 @@ public class ConsultDatabase extends Thread {
         if (indexRegiaoMenorQue30 != -1) {
             if (indexRegiaoMenorQue30 == listaBD.size() - 1) {
                 Log.d("Consulta Banco de Dados", " Adicionando SubRegion (Último elemento do banco)");
-                RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore, listaBD.get(indexRegiaoMenorQue30));
+                RegionUpdaterThread thread = new RegionUpdaterThread(regions, listaBD,indexRegiaoMenorQue30, newName, newlatitude, newlongitude, semaphore, listaBD.get(indexRegiaoMenorQue30));
                 thread.start();
             } else {
                 boolean avalia = false;
@@ -292,7 +292,7 @@ public class ConsultDatabase extends Thread {
             }
         } else {
             Log.d("Consulta Banco de Dados", " Nenhuma região do banco está a menos de 30 metros de distância do novo dado");
-            RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore);
+            RegionUpdaterThread thread = new RegionUpdaterThread(regions,listaBD, newName, newlatitude, newlongitude, semaphore);
             thread.start();
         }
     }
@@ -302,13 +302,19 @@ public class ConsultDatabase extends Thread {
             Log.d("Consulta Banco de Dados", " Adicionando RestrictedRegion");
             SubRegion subregion = (SubRegion)listaBD.get(index);
             Region mainRegion = subregion.getMainRegion();
-            RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore, true, mainRegion);
+            RegionUpdaterThread thread = new RegionUpdaterThread(regions,listaBD,index, newName, newlatitude, newlongitude, semaphore, true, mainRegion);
             thread.start();
-        } else {
+        } else  if ("RestrictedRegion".equals(nomeSimplesUltimoElemento(listaBD, index))){
             Log.d("Consulta Banco de Dados", " Adicionando SubRegion");
             RestrictedRegion restrictedRegion = (RestrictedRegion) listaBD.get(index);
             Region mainRegion = restrictedRegion.getMainRegion();
-            RegionUpdaterThread thread = new RegionUpdaterThread(regions, newName, newlatitude, newlongitude, semaphore, mainRegion);
+            RegionUpdaterThread thread = new RegionUpdaterThread(regions,listaBD,index,newName, newlatitude, newlongitude, semaphore, mainRegion);
+            thread.start();
+        }else{
+            Log.d("Consulta Banco de Dados", " Adicionando SubRegion");
+
+            Region mainRegion = listaBD.get(index);
+            RegionUpdaterThread thread = new RegionUpdaterThread(regions,listaBD,index, newName, newlatitude, newlongitude, semaphore, mainRegion);
             thread.start();
         }
     }
