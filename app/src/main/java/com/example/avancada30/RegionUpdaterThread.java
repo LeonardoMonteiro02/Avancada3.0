@@ -17,23 +17,15 @@
 package com.example.avancada30;
 
 
-import android.content.Context;
-import android.content.Intent;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.example.biblioteca.Region;
 import com.example.biblioteca.RestrictedRegion;
 import com.example.biblioteca.SubRegion;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.example.biblioteca.GeoCalculator;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.Semaphore;
 
 public class RegionUpdaterThread extends Thread {
@@ -142,8 +134,6 @@ public class RegionUpdaterThread extends Thread {
                 listaBD.addAll(regions);
                 regions.clear();
                 regions.addAll(listaBD);
-                System.out.println("Elementos da lista Banco:");
-                imprimirElementos(listaBD);
                 System.out.println("Elementos da lista:");
                 imprimirElementos(regions);
                 Log.d("Consulta Lista", "Região restrita adicionada: " + restrictedRegion.getName());
@@ -154,8 +144,6 @@ public class RegionUpdaterThread extends Thread {
                 listaBD.addAll(regions);
                 regions.clear();
                 regions.addAll(listaBD);
-                System.out.println("Elementos da lista Banco:");
-                imprimirElementos(listaBD);
                 System.out.println("Elementos da lista:");
                 imprimirElementos(regions);
                 Log.d("Consulta Lista", "Região adicionada: " + region.getName());
@@ -166,8 +154,6 @@ public class RegionUpdaterThread extends Thread {
                 listaBD.addAll(regions);
                 regions.clear();
                 regions.addAll(listaBD);
-                System.out.println("Elementos da lista Banco:");
-                imprimirElementos(listaBD);
                 System.out.println("Elementos da lista:");
                 imprimirElementos(regions);
                 Log.d("Consulta Lista", "Sub-região adicionada: " + subRegion.getName());
@@ -187,7 +173,11 @@ public class RegionUpdaterThread extends Thread {
                 verificaLista(regions);
             }
             if (restrictedRegion != null) {
-                regions.add(buscarIndiceElemento(regions,listaBD.get(index))+1,restrictedRegion);
+                try {
+                    regions.add(buscarIndiceElemento(regions,listaBD.get(index))+1,restrictedRegion);
+                }catch (Exception e){
+                    Log.d("Consulta Lista", "Elemento invalido");
+                }
                 System.out.println("Elementos da lista:");
                 imprimirElementos(regions);
                 Log.d("Consulta Lista", "Região restrita adicionada: " + restrictedRegion.getName());
@@ -197,7 +187,12 @@ public class RegionUpdaterThread extends Thread {
                 verificaLista(regions);
             }
             if (subRegion != null) {
-                regions.add(buscarIndiceElemento(regions,listaBD.get(index))+1,subRegion);
+                try {
+                    regions.add(buscarIndiceElemento(regions,listaBD.get(index))+1,subRegion);
+
+                }catch (Exception e){
+                    Log.d("Consulta Lista", "Elemento invalido");
+                }
                 System.out.println("Elementos da lista:");
                 imprimirElementos(regions);
                 Log.d("Consulta Lista", "Sub-região adicionada: " + subRegion.getName());
@@ -261,6 +256,8 @@ public class RegionUpdaterThread extends Thread {
             listaBD.addAll(regions);
             regions.clear();
             regions.addAll(listaBD);
+            System.out.println("Elementos da lista:");
+            imprimirElementos(regions);
         }
     }
 
@@ -316,3 +313,7 @@ public class RegionUpdaterThread extends Thread {
     }
 
 }
+
+
+
+

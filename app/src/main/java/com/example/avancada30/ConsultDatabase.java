@@ -18,15 +18,12 @@ package com.example.avancada30;
 
 
 
-import android.content.Context;
 import android.util.Log;
 import androidx.annotation.NonNull;
 
-import com.example.biblioteca.GeoCalculator;
 import com.example.biblioteca.Region;
 import com.example.biblioteca.RestrictedRegion;
 import com.example.biblioteca.SubRegion;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
