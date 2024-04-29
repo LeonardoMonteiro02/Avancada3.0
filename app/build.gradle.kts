@@ -39,7 +39,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:18.0.0")
     implementation("com.google.android.gms:play-services-location:19.0.0")
     implementation("com.google.android.libraries.places:places:3.1.0")
-    implementation (project(":Biblioteca"))
+    implementation ("com.example:biblioteca:1.0")
     implementation ("com.fasterxml.jackson.core:jackson-databind:2.12.3")
     implementation(libs.firebase.database)
     testImplementation(libs.junit)
